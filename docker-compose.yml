@@ -1,0 +1,45 @@
+---
+
+services:
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    restart: always
+    ports:
+      - "5000:11434"
+    volumes:
+      - ./data:/root/.ollama
+    networks:
+      - ollama-network
+    # Uncomment for NVIDIA GPU support:
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - capabilities: [gpu]
+    # environment:
+    #   - NVIDIA_VISIBLE_DEVICES=all
+    entrypoint: >
+      sh -c "
+        ollama serve &
+        sleep 5 &&
+        ollama pull deepseek-r1:7b &&
+        ollama pull locusai/all-minilm-l6-v2 &&
+        wait
+      "
+
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: qdrant
+    restart: unless-stopped
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    volumes:
+      - ./qdrant:/qdrant/storage
+    networks:
+      - ollama-network
+
+networks:
+  ollama-network:
+    driver: bridge

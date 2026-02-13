@@ -1,0 +1,495 @@
+
+INSA Lyon - Département Informatique
+
+Rapport 
+de 
+Projet de fin d’études
+
+
+Development of an isochrone 
+generation Geo Service
+
+Développement d’un Géo Service de génération d’isochrones
+
+
+Rivaldo Chanceme de SOUZA
+
+Project conducted from 06 Février 2023 to 23 Juin 2023 
+within the reception structure 
+Business Geografic  Villeurbanne(Lyon) 
+
+
+Tuteur Pédagogique : Mathieu MARANZANA, Maître de Conférences, INSA Lyon
+Maître d’Apprentissage : Robin THERRY, Responsable développement GMAO 
+Superviseur : Olivier SOTIN, Responsable Pôle R&D GEO
+Manager développement Pôle DATA : Nicolas VRIGNEAUD 
+
+
+Table des matières
+Remerciements	3
+Glossaire	4
+Définitions	4
+1. Introduction	5
+2. Présentation du sujet	6
+2.1. Entreprise & Equipe Projet	6
+2.2. Contexte du Projet	8
+2.2.1. Importance des isochrones en Géomarketing	8
+2.2.2. La problématique	8
+2.3. Objectifs et enjeux du Projet	10
+3. Etude bibliographique et théorique	11
+3.1. Etude bibliographique	11
+Les données géographiques	11
+Normalisation de l’API	14
+3.2. Etude théorique	16
+Fonctionnalités principales	16
+4. Implémentations techniques	20
+4.1. API de Routing	21
+API middleware	21
+Valhalla routing	21
+4.2. Architecture technique	23
+4.3. Interface de visualisation	23
+5. Expérimentations et validations	25
+5.1 Expérimentations	25
+5.2 Validations	26
+6. Bilan Personnel	30
+6.1 Problèmes rencontrés	30
+6.2 Responsabilité sociale de l’ingénieur	31
+7. Conclusion & Perspectives	32
+8. Références bibliographiques	33
+Annexes	34
+Résumé	35
+Abstract	35
+Remerciements
+Je tiens avant tout à remercier Monsieur Mathieu MARANZANA pour sa disponibilité et ses conseils tout au long de ce projet de fin d’études. Je remercie également l’ensemble des chefs de projets de Ciril Group qui ont suivi le projet de près durant les vingt(20) semaines de travail :
+Nicolas VRIGNEAUD - Manager développement du pôle DATA, 
+Olivier SOTIN - Responsable du pôle R&D GEO, 
+Robin THERRY - Responsable développement GMAO (également mon maître d’apprentissage durant mes trois années d'alternance chez Ciril GROUP).
+
+
+Glossaire
+  	CRS: Coordinate Reference System    
+  	HTTP: HyperText Transfer Protocol
+  	ISO: International Organization for Standardization    
+  	OGC: Open Geospatial Consortium
+  	WPS: Web Processing Service
+  	BG: Business Geografic    
+  	OSM: OpenStreetMap
+  	SIG: Système d’Information Géographique
+Définitions
+- Douglas-Peucker generalization: En algorithmique géométrique, l’algorithme de Douglas-Peucker, aussi connu sous le nom d'algorithme de Ramer-Douglas-Peucker, sert à simplifier un polygone ou une ligne brisée en supprimant des points. À chaque étape, on parcourt tous les points entre les bornes et on sélectionne le point le plus éloigné du segment formé par les bornes. Et ceci de manière récursive jusqu'à ce qu'il n'y ait plus de points entre les dernières bornes. Au final, on se retrouve avec une courbe ayant la même tendance que l’ancienne mais avec moins de points.
+
+-  Parcours de Graham: Le parcours de graham (aussi appelé algorithme de Graham) est un algorithme pour le calcul de l'enveloppe convexe d'un ensemble de points dans le plan. Son principal intérêt est sa complexité algorithmique en O(n log n) où n est le nombre de points. 
+1. Introduction
+De nos jours, les professionnels du marketing mettent de plus en plus en avant la dimension géographique dans leurs analyses et estimations,  on parle de géomarketing. Cette discipline du marketing s’appuie énormément sur des systèmes d’informations géographiques pour effectuer les calculs dont elle a besoin. Lorsque ces calculs sont fournis à travers des solutions web, on les appelle des “géoservices”. Depuis quelques années, l’un des géoservices les plus utilisés par les clients de l’entreprise est devenu obsolète, le générateur d'isochrones. C’est justement dans le cadre du développement d’une nouvelle version du géoservice de génération d’isochrones que ce projet a vu le jour. L’objectif de ce projet de fin d’études est donc d’étudier l’existant, pour proposer une stratégie de mise à jour ou d’évolution assurant le retour de la qualité de services. 
+
+Etymologiquement, isochrone vient du grec isókhronos qui signifie “égal dans sa durée”. C’est la courbe joignant les points atteints dans le même temps à partir d'un lieu de départ donné avec un moyen de déplacement précis. En géomarketing, cette courbe sert à délimiter une zone géographique dans laquelle tous les points sont atteignables dans un intervalle de temps donné (il peut arriver que la limite soit un équivalent en distance). En considérant un restaurant par exemple, une isochrone peut définir l’ensemble des zones de provenance de la principale clientèle en faisant l’hypothèse qu’elle ne fait pas plus de 10 minutes de trajet en voiture. 
+
+2. Présentation du sujet
+2.1. Entreprise & Equipe Projet
+Entreprise
+ 	Le projet s’est déroulé au sein de l’entreprise Ciril Group qui est un éditeur de logiciels et un hébergeur Cloud qui fait partie des principaux acteurs de l’innovation française en matière de systèmes d’informations métier et géographique interopérables, de géomarketing mais aussi de l’hébergement cloud haute sécurité et qualité.  L’entreprise Ciril GROUP est constituée de plusieurs divisions aux activités complémentaires:
+Ciril: spécialisé dans les logiciels de gestion pour les collectivités territoriales, établissements publics, syndicats, etc…
+Synaaps: spécialisé dans l’hébergement cloud et l’infogérance. SynAApS propose ses services d’hébergement PaaS - IaaS (Platform as a Service - Infrastructure as a Service)
+Business Geografic: spécialisé dans la cartographie web et mobile et les systèmes d'information géographique (SIG). 
+
+Equipe Projet
+ 	Ce projet s’est déroulé en collaboration  avec différentes équipes de l’entreprise à travers les interventions de:
+Olivier SOTIN (Chef de projet R&D Géo) 
+Robin THERRY (Tuteur de PFE et Chef de projet GMAO)
+Nicolas VRIGNEAUD (Manager du Pôle DATA)
+
+Organigramme
+
+2.2. Contexte du Projet
+2.2.1. Importance des isochrones en Géomarketing
+Dans le métier du Géomarketing, il est important de pouvoir effectuer des estimations et des projections sur les surfaces d’influences et/ou d’attractions des différents points de ventes ou magasins sur un territoire géographique donné. On appelle cette aire géographique d’où proviennent les clients, zone de chalandise. On peut la diviser en plusieurs niveaux à savoir la zone primaire, la zone secondaire et la zone tertiaire. Les courbes isochrones servent à donner un rendu visuel de ces zones théoriques mais également:
+à estimer de potentiels chiffre d’affaires
+à calculer le taux de couverture d’un réseau de franchise ou de services publics
+à évaluer l’efficacité d’un réseau routier en fonction des modes de déplacements
+Il est donc important de pouvoir générer des isochrones en masse à partir d’une base de points de vente, de concurrents, de clients, etc …
+
+Le besoin se situe aussi bien pour la production interne sur les études de marché, la création d’applications autour de GÉO (progiciel développé au sein de l’entreprise pour créer plus facilement des logiciels de type système d’information Géographique) que pour les clients à travers des applications basées sur la technologie GÉO développée par l’entreprise (via le module isochrone et le module de sectorisation).
+2.2.2. La problématique
+Depuis quelques années, le service web de générations d’isochrones de l’entreprise ne répond plus correctement aux besoins des utilisateurs et ceci sur de nombreux aspects.
+A. Obsolescence du géoservice d’isochrones (données + moteur)
+Le GéoService actuel de génération d’isochrones, bien que satisfaisant sur ses aspects fonctionnels, est devenu obsolète et n’évolue plus depuis plus de 6 (six) ans et ceci pour plusieurs raisons:
+Il se base sur un référentiel Openstreetmap lui aussi vieux de 6 ans, les données sont donc obsolètes car de nombreuses routes ont été ajoutées et les limitations de vitesses ont également été modifiées. 
+Il est propulsé par la version 0.13 du moteur de routing GraphHopper qui en est aujourd’hui à la version 7.X et qui nécessitait une adaptation spéciale pour effectuer le calcul d’isochrones qu’il ne supporte pas nativement. C’est ce qui est en partie à l’origine des autres sous problèmes.
+B. Surestimation du calcul d’isochrones
+
+Comparé à celles d’autres outils du marché, les isochrones de l’outil actuel sont énormément surestimés. Parfois la surestimation peut aller jusqu’à 400% en zone urbaine comme à Paris.  
+C. Mauvaise qualité en région côtière
+
+Dans ce cas de figure, l’isochrone obtenue est complètement incohérente par rapport au point de départ et c’est le cas dans la plupart des régions côtières. Parfois on obtient même pas de résultats c’est-à-dire que la géométrie renvoyée est invalide.
+D. Restrictions fantômes
+
+Dans ce cas de figure, on constate que le générateur d’isochrones applique des restrictions fantômes car il évite par exemple la rue du 1er éperon qui après vérification ne souffre d’aucune restriction en réalité. Cela se répète un peu partout sur cette représentation qui n’a aucune cohérence. 
+2.3. Objectifs et enjeux du Projet
+ 	L’objectif principal du projet de fin d’études est de développer un GéoService d’isochrones basé sur des référentiels modernes et à jour. 
+Pour atteindre cet objectif, il sera nécessaire de: 
+moderniser ou changer le moteur de génération d’isochrones actuellement basé sur GraphHopper et le rendre plus souple et plus paramétrable.
+prévoir la possibilité de pouvoir s’interfacer avec différents services d’isochrones tels que l’API Here, Smappen.
+faire en sorte que ce GeoService puisse s’intégrer aux outils actuels avec un minimum d’impacts et de changements:
+Interface des Géoservices: https://geoservices.business-geografic.com/isochrone/app/
+Module Isochrone de GEO
+Module Sectorisation de GEO
+Via API: https://sources.ops.ciril.lan/geo-rd/geo/aigle-services-proxy
+3. Etude bibliographique et théorique
+3.1. Etude bibliographique
+ 	A partir des insuffisances de l’outil en production et des objectifs du projet, il convient d’éclaircir certaines zones d’ombres afin d’identifier les défis techniques auxquels ont pourrait être confrontés:
+Les données géographiques
+Importance des données géographiques
+ 	Pour appréhender l’importance des données géographiques, il faut se pencher sur le fonctionnement des moteurs de routing. En effet, ces outils pour fonctionner, ont besoin de construire un graphe par association de nœuds et d’arêtes au cours d’un traitement appelé “build and load”. Le réseau routier mondial  est donc représenté à l’aide d’un graphe dont les nœuds définissent des coordonnées gps (longitude et latitude) et les arêtes des axes routiers annotées avec des propriétés utiles pour les algorithmes de routage tels que les limitations de vitesse, la signalisation, l’altitude, l’inclinaison, la distance, …. 
+
+Source des données géographiques
+ 	L’ensemble des données géographiques nécessaires à la construction du graphe routier sont rendus disponibles grâce à un projet collaboratif appelé Openstreetmap. Il existe des extractions de ces données aux échelles continentales, nationales, départementales et régionales. Les données sont actualisées quotidiennement et sont nativement au format XML compressible au format pbf qui offre d’excellente performance(5 fois plus rapide à lire et 6 fois plus rapide à écrire).
+
+Représentation d’un fichier de données
+ 	Les données OSM sont représentées: 
+comme une ou plusieurs géométries (description de l’élément)
+Les géométries sont décrites à l’aide de trois éléments: les nœuds (node), les voies (way) et les relations (relation). 
+Les nœuds sont l'équivalent d'un point 
+Les voies sont des lignes qui relient les points 
+Les relations sont des collections de points ou de voies qui permettent de représenter des ensembles plus vastes.
+avec un ensemble d’attributs associés appelé tag
+
+L’incomplétude des données Openstreetmap
+	Il est important de noter que les données Openstreetmap ne sont pas parfaitement remplies pour tous les axes routiers. Par exemple, malgré le fait que la France soit l’un des pays les mieux décrits au monde sur openstreetmap c’est-à-dire que le rapport de la taille du fichier pbf(4.4 GB sur les 68 GB de la planète) sur la superficie  est le plus élevé, seules 0.92% (72.168/7.845.619 ways) des routes ont une limitation de vitesse définies.  Cet état de chose fait qu’une étude approfondie des législations sur les limitations de vitesse est nécessaire. En effet, en se basant sur:
+l’article 413 du code de la route (concernant les limitations de vitesse)
+les descriptions officielles des tags sur openstreetmap.org (way, …)
+les données wikipédia sur les limitations de vitesse.
+Il est possible de définir des règles d’inférence permettant d’annoter les routes avec des tags importants dans le routage comme:
+maxspeed: la vitesse maximale autorisée sur le tronçon
+oneway: si l’axe routier est bidirectionnel
+lanes: le nombre de voies sur la route
+Les valeurs d’annotations dépendent énormément de la valeur du tag highway qui définit le type de route et donc indirectement les règles à appliquer. Les valeurs possibles dans OSM sont motorway, trunk, primary, secondary, tertiary, residential, unclassified … . On a aussi les link (motorway_link par exemple) pour les bretelles d’accès d’entrées ou de sorties correspondantes et les roundabout (rond-points).
+
+Les données de trafic routier
+ 	Il arrive que les utilisateurs de l’outil actuel aient besoin de simuler un calcul d’isochrone à une heure différente de l’heure courante pour effectuer des projections à long terme. C’est là qu’entre en jeu le support des données de trafic. En d’autres termes, une fonctionnalité autorisant l’influence de la vitesse réel de circulation sur les isochrones obtenues. On distingue deux catégories de données de trafic: historique et temps réel.
+ 	Le trafic historique
+Il représente l’ensemble des valeurs mesurées à intervalles de temps réguliers sur une période donnée. Par exemple, on relève les vitesses moyennes de déplacements toutes les 5 minutes pendant une semaine et on considère que la séquence est périodique. On peut donc ensuite calculer une isochrone à un jour et une heure précise  en appliquant la vitesse correspondante pendant l’estimation.
+ 	Le trafic temps réel
+Il consiste à alimenter en permanence le graphe routier avec un flux de notification valeur de vitesse pour chaque axe routier. Chaque axe routier a une valeur de vitesse moyenne par défaut et chaque notification porte une valeur en temps réel avec une durée de validité. Ainsi on peut indiquer par exemple un ralentissement de 12 minutes suite à un accident puis un retour à la normale. 
+Cependant, le trafic temps réel a une limite importante. Les estimations  étant effectuées à un instant t, plus on s’éloigne du centre plus l’isochrone devient impertinente car le trafic a évolué. C’est pour cela que le trafic historique est plus pertinent dans notre cas d’utilisation.
+
+Normalisation de l’API
+ 	Le géoservice  que je développe sera mis à disposition des utilisateurs à travers une API web communiquant avec le moteur de routing chargé d’effectuer les calculs d’isochrones. Afin de garantir l'interopérabilité de l’API avec d’autres services, il est important de respecter les normes en vigueur. Dans notre cas, il s’agit de la norme WPS de l’OGC.
+
+Norme WPS de l’OGC
+ 	La spécification WPS (Web Processing Service) de l'OGC (Open Geospatial Consortium, Inc.) est une spécification internationale de diffusion et d'exécution de traitement géospatial sur le Web. Il prend en charge à la fois le traitement immédiat pour les tâches de calcul qui prennent peu de temps à s'exécuter et le traitement asynchrone pour les tâches plus complexes et plus longues. Une tâche qui dure plus de 5 secondes est considérée comme longue. Une application respectant la norme OGC et qui effectue des traitements longs, doit implémenter un mécanisme de jobs pour supporter à la fois des appels synchrones (bloquants) et asynchrones (non bloquants).
+
+Système de jobs
+mode synchrone
+
+Dans le mode synchrone, le processus ayant lancé la requête établit une connexion réseau et la maintient en attendant une réponse. Le temps maximal de réponse est défini par le timeout. Pour des processus au temps d’exécution trop élevés, cette approche est problématique car l'appel au réseau est bloquant et il faut attendre la réponse avant d’effectuer une autre tâche. 
+mode asynchrone
+
+Le mode asynchrone permet de lancer des traitements en arrière plan sans maintenir de connexion au réseau. Dans cette configuration, toutes les requêtes ont un temps de réponse fixe et très court (même quand le traitement est long).  Il implémente un mécanisme de job qui représente les tâches de calculs effectuées en arrière plan à travers plusieurs requêtes: 
+Une requête créée le job en arrière plan et retourne l’identifiant unique correspondant
+Une requête permet de connaître l’état d’un job à un instant t en fournissant son identifiant unique
+Une requête permet de récupérer le résultat d’un job qu’on sait terminé à partir de son identifiant unique.
+3.2. Etude théorique
+Fonctionnalités principales
+En termes de calcul d’isochrones, il existe plusieurs formes de sorties qui dépendent de l’utilisation qu’on souhaite faire du résultat. Certaines fonctionnalités sont indispensables par rapport aux attentes des utilisateurs.
+Network
+C’est le terme utilisé pour désigner le graphe routier sous-jacent à la courbe isochrone. Le résultat est une collection d’axes routiers partant du point de calcul d’isochrone et s’arrêtant à la limite défini dans la requête.
+
+
+Isoline
+C’est le terme technique permettant de désigner à la fois les isochrones et les isodistances. C’est également le nom donné à l’algorithme le plus efficace pour calculer ce type de courbes dans nos applications. Les points de la courbe sont obtenues en appliquant l’algorithme de Graham (calcul de l’enveloppe convexe d'un ensemble de points dans le plan) sur le résultat du calcul précédent.
+
+
+Fastline
+C’est le nom de la version simplifiée de isoline. Elle réduit le nombre de points renvoyés par l’algorithme en utilisant l’algorithme de Douglas-Peucker (simplification de polygones par suppression de points). Les courbes sont moins précises mais plus rapides à charger tout en conservant l’emprise initiale.
+
+
+Buffer
+Le buffer désigne une valeur réelle en mètres définissant une tolérance autour d'un réseau routier dans le calcul de network. En l’associant au calcul de network, on obtient un réseau avec une aire plus grande. Une application de cette fonctionnalité pourrait être par exemple, en faisant une intersection de ce graphe bufferisé avec des points d’intérêts (restaurants, hôpitaux, …) trouver les endroits clés les plus proches accessibles par la route.  
+
+
+Step
+La fonctionnalité step sert à découper les résultats globaux en petit morceaux afin de pouvoir effectuer des analyses plus pointues. Sur l’image ci-dessous, on voit un calcul de network avec deux steps. D’un point de vue métier, cette fonctionnalité peut être utilisée pour représenter les zones de chalandises primaires, secondaires et même tertiaires.
+
+4. Implémentations techniques
+4.1. API de Routing
+	Pour fournir les fonctionnalités attendues et assurer une compatibilité avec les applications qui utilisent l’ancien outil,  j’ai mis en place  une application qui sert d'intermédiaire entre les utilisateurs et le moteur de routing. Pour faire simple, elle traduit les requếtes du format de l’ancien outil vers celui du nouveau service chargé d’effectuer les calculs d’isochrones.
+API middleware
+ 	Pour construire l’API, j’ai adopté l’approche design first qui consiste à spécifier le contrat d’utilisation détaillé (endpoints, paramètres en entrée et format du résultat en sortie, règles de sécurité,  etc …) avant de commencer à coder. Ensuite, on génère le squelette du code de l’application qu’on peut ensuite étendre et personnaliser à volonté. 
+
+Java comme langage de programmation
+Pour assurer la pérennité du projet et la qualité du développement, j’ai choisi le langage Java pour sa popularité et la disponibilité de librairies fournissant des fonctions de calculs topologiques utiles. 
+
+Spring Boot comme framework
+ 	Pour profiter d’une facilité d’utilisation et de bonnes performances en production du serveur web, j’ai choisi le framework Spring boot. Il s’agit d’une suite d’outils qui facilitent le développement d’applications en fournissant des fonctionnalités de bases comme la sécurisation, la gestion du mode asynchrone,  la répartition de la charge. 
+
+
+Valhalla routing
+ 	Pour garantir la qualité des calculs, il est important de choisir un moteur de routing performant répondant à plusieurs critères dont les plus importants sont:
+la précision et la qualité des résultats (en région côtière, en agglomération, en zone rurale)
+la facilité de déploiement
+l’activité de la communauté autour du projet
+le format des données en entrée et en sortie
+le temps de réponse
+le support des autres fonctionnalités comme le calcul d’itinéraires, …
+…
+En étudiant un ensemble de moteurs de routing disponible sur le marché tels que OSRM(Open Source Routing Machine) , GraphHopper, OpenRouteService , Valhalla j’ai procédé par élimination suivant les critères prédéfinis. Ensuite, j’ai réalisé une étude comparative pour effectuer un choix pour la suite.
+
+
+Le comparatif
+ 	Voici un tableau comparatif du Top 4 des solutions présélectionnées à savoir: OSRM, GraphHopper, Valhalla, Openrouteservice.
+
+
+
+OSRM
+GraphHopper
+Valhalla
+OpenRouteService
+Activité (fréquence des commits/issues)
+***
+*****
+*****
+*
+Performance générale(vitesse de calcul, …)
+*****
+****
+****
+****
+Nombre de CPUs nécessaires 
+16 
+12
+8
+12
+RAM (nécessaire au build and load)
+128GB RAM
+64 à 128GB RAM (planète)
+16GB RAM pour tous les profils en 12 heures
+128GB RAM (planète)
+RAM (nécessaire au runtime)
+64GB 
+16GB RAM
+16GB RAM
+32GB RAM
+Configurabilité
+**
+***
+***
+*
+Flexibilité (au niveau du paramétrage des requêtes) 
+*
+***
+****
+*
+
+
+PS: Les étoiles(*) représentent les notes qu’on pourrait attribuer aux critères.
+NB: Le choix de Valhalla Routing a été consécutif à une étude comparative détaillée de plusieurs solutions du marché (benchmark, analyse visuelle des résultats, tests de performances sur une même infrastructure, temps de réponse) qui a donné lieu à un rapport d’environ 15 pages.
+
+
+4.2. Architecture technique
+	A partir des résultats du comparatif, j’ai décidé de travailler avec Valhalla qui est l’outil qui répond le mieux aux principaux critères. Ainsi une architecture simple de déploiement de la solution peut être représentée comme suit.
+
+C’est cette architecture que j’ai mis en place sur les serveurs de développements et de tests à l’aide de la conteneurisation avec Docker. Une fois tous les modules développés, j’ai créé les images docker correspondantes et je les ai déployé sur les serveurs de développements et de tests.
+4.3. Interface de visualisation
+	Pour obtenir un rendu visuel des calculs d’isochrones, j’ai développé une interface de visualisation avec le framework vue.js et Leaflet pour la carte afin de faciliter les tests et la comparaison de résultats par rapport à l’ancien outil. Les utilisateurs peuvent ainsi obtenir le résultat visuel instantané de leurs configurations.
+Les configurations pour le calcul d’isochrone se résume au paramétrage des requêtes avec les informations comme:
+le mode: temporel ou distanciel
+la limite: respectivement en secondes ou en mètres en fonction du mode pour définir la valeur de seuil
+le format de sortie: json, wkt (well known text)  ou geojson
+le type de sortie: network, fastline ou isoline
+le mode de transport: voiture, camion, taxi, vélo, piéton, 2 roues (50 cm3)
+….
+
+
+
+5. Expérimentations et validations
+5.1 Expérimentations
+Pour dimensionner correctement les machines à utiliser en production, il est important d’étudier les performances du moteur valhalla. La phase la plus importante dans l’utilisation du moteur valhalla est le build and load. C’est au cours de cette phase que le graphe routier basé sur les données OSM est construit. L’étude du fonctionnement de Valhalla montre qu’on peut la diviser en 05 étapes importantes:
+build admins: définitions des limites administratives et naturelles
+build timezone: définitions du fuseau horaire  
+build initial graph: construction du graphe (noeuds et arêtes annotés)
+download elevation tiles: récupération des données d’altitudes et d’inclinaisons
+Enhancing the initial graph: optimisation du graphe à partir des données téléchargées 
+
+Afin de construire le graphe routier de plusieurs pays, j’ai expérimenté le build and load incrémental qui consiste à rajouter progressivement des données supplémentaires.
+
+Etape
+&
+Conditions
+16 GB RAM + 4 CPU
+France
+4.1 GB de pbf
+16 GB RAM + 4 CPU + Suisse
+4.5 GB de pbf
+16 GB RAM + 4 CPU
++ Espagne  
+5.5 GB de pbf
+16 GB RAM + 4 CPU
++ Italie
++ Belgique
++ Luxembourg
+7.7537 GB de pbf
+build admins db
+7min4s
+X
+X
+X
+build timezone db
+14s
+X
+X
+X
+build initial graph
+1h25min39s
+2h31min2s
+7h1min37s
+12h7min3s
+download elevation tiles
+1min1s
+7s
+57s
+40s
+Enhancing the initial graph
+34min46s
+50min24s
+1h28min52s
+1h49m25s
+Total
+2h17min14s
+3h21min33s
+8h31min26s
+13h57min15s
+
+Relevé du build and load incrémental sur la même machine d’évaluation
+
+
+
+Nombre de CPU
+1 CPUs
+4 CPUs
+8 CPUs
+Temps de traitement
+en fonction du nombre de CPUs
+3h34min27s
+2h17min14s
+1h10min13s
+
+Impact du nombre de CPUs sur le temps de build and load sur un pbf France métropolitaine(4,1 GB).
+
+ 	Ces résultats s'expliquent par le fait que durant les phases de construction du graphe et optimisation, des threads sont créés en fonction du nombre de CPU disponible sur la machine afin de paralléliser le processus. Ainsi plus il y a de CPUs et plus la durée du build est raccourcie.
+5.2 Validations
+Les écarts d’estimations
+Métriques de mesures
+ 	Pour quantifier les différences de mesures et notamment le degré de surestimation d’une isochrone par rapport à une autre, j’ai utilisé une métrique appelée la distance de Hausdorff. La distance de Hausdorff mesure l’éloignement de deux sous-ensembles d'un espace métrique. De manière informelle, il s'agit de la plus grande des distances entre un point d'un ensemble et le point le plus proche de l'autre ensemble. 
+
+ 	Ce calcul appliqué à deux courbes isochrones(obtenues à partir du même point) permet de mesurer l’écart entre les estimations. On obtient alors un réel qui témoigne de cette réalité physique. En effectuant une comparaison entre une isochrone considérée comme fiable et une autre à évaluer, on peut quantifier à quel point l’isochrone évaluée est éloignée de la réalité et donc procéder aux ajustements.
+
+L’approche par clusterisation 
+ 	Dans le but d’améliorer les résultats du moteur de routing, j’ai mis en place une configuration de Valhalla basé sur la norme ISO 3166  qui permet de définir des codes internationalement reconnus de lettres et/ou de chiffres qui peuvent être utilisés pour désigner des pays(ISO 3166-1) et leurs subdivisions principales(ISO 3166-2). Par exemple pour Paris, on a ISO 3166-1 = FR et ISO 3166-2=IDF.
+
+Ensuite, pour chaque subdivision (comprenez régions dans le cas de la France), on crée des clusters en se basant sur la densité du réseau routier (nombre de nœuds ou de voies ou d’intersections par zones).  On obtient ainsi trois groupes de sous-régions appelées urbaines, périurbaines et rurales. On peut ensuite appliquer des vitesses de circulations en fonction du cluster considéré ce qui améliore nettement la qualité des résultats.
+
+Évolution des estimations en fonction de la région par rapport à une solution concurrente considérée comme une référence de qualité.
+
+version/région
+île-de-france
+Bretagne
+Occitanie
+Rhône-Alpes
+PACA
+v1
++ 110%
++ 40%
++ 15%
++  30%
++  50%
+v2
+- 2.1 %
++ 5%
++ 2.5%
++ 4%
++ 3.4%
+
+Isochrone en région parisienne (vs isochrone d’un concurrent).
+
+API de routing vs Concurrent
+Constats:
+Les estimations sont très proches en considérant les amplitudes des courbes (distances aux extrémités en partant du centre)
+Le concurrent présente des incohérences par rapport au réseau routier. En effet, les routes en jaune sont des voies rapides où logiquement les véhicules sont censés pouvoir se déplacer plus vite mais on voit que selon l’isochrone, il faut quitter la voie rapide puis y revenir.
+La qualité en région côtière
+Isochrones de 20 min en voiture à verdon-sur-mer (vs résultat de Google Maps).
+
+En rouge le résultat de la v1 de l’API de routing et en bleu le résultat de la v2 qui suit bien les contours de la côte. Au passage, on relève la proximité du résultat avec celui de Google Maps.
+Isochrones de 20 min en voiture à la Roche-sur-yon (vs résultat de Google Maps).
+
+Bonne prise en compte des limites naturelles de la région.
+
+Les restrictions fantômes
+ 
+Sur ce résultat, on constate que les axes routiers ne souffrent plus de restrictions infondées et que le réseau routier considéré par le moteur de routing est proche de la réalité. 
+6. Bilan Personnel
+6.1 Problèmes rencontrés
+La qualité des données dans OpenStreetMap
+
+Sur ce résultat, on constate l’existence d’un tronçon de route fantôme susceptible de générer des isochrones difformes. La route continue sur l’océan ce qui est impossible dans la réalité.
+Les bugs non encore corrigées dans Valhalla
+
+Des morceaux d’axes routiers ‘parasites’ apparaissent dans les réseaux renvoyés par valhalla et nécessitent donc un nettoyage avant utilisation. Il s’agit d’un bug provenant de la version actuelle de Valhalla. Je l'ai signalé aux développeurs de l’outil et j’ai trouvé un moyen de contourner le problème par programmation en supprimant tous les éléments se trouvant en dehors de l’isochrone correspondante.
+6.2 Responsabilité sociale de l’ingénieur
+A l’ère de l’éveil des consciences sur les impacts de l’informatique sur la planète, il est important pour un ingénieur d’évaluer l’empreinte globale des solutions qu’il développe. En effet, dans le monde de l’informatique, certains choix même triviaux peuvent avoir des implications très graves pour le monde qui nous entoure. Il est donc nécessaire pour un ingénieur de se poser les bonnes questions sur les conséquences et la pertinence de ses choix au quotidien. Il doit assumer simultanément ses responsabilités vis-à-vis de son travail et de son environnement. En ce qui concerne  le projet de génération d’isochrones, cette éthique de travail a influencé nos choix sur plusieurs aspects. 
+
+Premièrement, dans le choix de la technologie, j’ai fait attention à favoriser:
+les solutions peu gourmandes en ressources et qui ne nécessitent pas une puissance de calcul trop importante et permanente. 
+les solutions dont la mise à jour est aisée et économique (processus intelligent qui ne prend en compte que les modifications)
+les solutions possédant un mode veille (basse consommation d’énergie dans les périodes de faible sollicitation)
+
+Deuxièmement, dans le développement de notre API middleware, je me suis assuré:
+de mettre en place un mécanisme de cache à la fois sur le reverse-proxy pour faciliter l’accès aux ressources, et dans l’API pour servir plus rapidement les requêtes les plus fréquentes
+d’éviter au maximum les doubles calculs inutiles (notamment dans la fonctionnalité step associé au buffer)
+d’ordonner nos appels de fonctions pour calculer le moins possible dans les cas d’utilisations les plus fréquents (geojson en sortie, calcul d'isochrone pour un seul step)
+choisir un framework de développement et un langage connus pour leurs frugalités en termes de consommation de ressources et de performances en production
+	
+Troisièmement, avant et pendant le dimensionnement de notre infrastructure de déploiement, j’ai fait:
+des tests de capacité pour évaluer les ressources minimales nécessaires au bon fonctionnement du système
+des benchmarks sur la consommation de la mémoire (RAM et ROM) pour s’assurer d’allouer en une seule fois la quantité d’espace requise et suffisante
+des choix d’architecture qui permettront à termes de ne faire les “build and load” que quand c’est nécessaire et non à chaque fois qu’on a une modification à faire. 
+7. Conclusion & Perspectives
+ 	Ce projet de développement d’une nouvelle version du géoservice de génération d’isochrones est arrivé dans un contexte où le besoin est réel tant pour les équipes de Business Geografic que pour les responsables de l’activité géomarketing de l’entreprise. Pour assurer le succès et la pérennité de ce projet j’ai fait des choix technologiques motivés à la fois par les performances et les responsabilités sociales de l’ingénieur vis à vis de son environnement.  La réalisation de ce projet a été l’occasion de mettre en pratique de nombreuses notions académiques, de découvrir de nouvelles technologies, d’apprendre énormément de choses dans le domaine des SIG. Ce fût également l’occasion de développer des compétences relationnelles et organisationnelles afin d’assurer la bonne marche du projet. Néanmoins, ce fût également  l’occasion de toucher  du doigt les insuffisances du domaine des SIG, que ce soit au sujet de la qualité ou de la disponibilité des données. 
+8. Références bibliographiques
+Barillot, Xavier, Jean-François Hangouët, et Hakima Kadri-Dahmani. « Generalization of the Douglas and Peucker Algorithm », s. d.
+« Complexité : Enveloppe convexe ». Consulté le 30 mai 2023. https://miashs-www.u-ga.fr/prevert/Prog/Complexite/graham.html.
+Data Center. « What Is the ISO (International Organization for Standardization)? » Consulté le 30 mai 2023. https://www.techtarget.com/searchdatacenter/definition/ISO.
+« Distance de Hausdorff. In Wikipédia, 9 mars 2023. https://fr.wikipedia.org/w/index.php?title=Distance_de_Hausdorff&oldid=202125066.
+« Documentation - GraphHopper Directions API ». Consulté le 30 mai 2023. https://docs.graphhopper.com/.
+« FR:Format PBF — OpenStreetMap Wiki ». Consulté le 30 mai 2023. https://wiki.openstreetmap.org/wiki/FR:Format_PBF.
+« GeoJSON—Aide ArcGIS Online | Documentation ». Consulté le 31 mai 2023. https://doc.arcgis.com/fr/arcgis-online/reference/geojson.htm.
+https://www.e-marketing.fr/. « Isochrone (courbe) ». Consulté le 29 mai 2023. https://www.e-marketing.fr/Definitions-Glossaire/Isochrone-courbe-242094.htm#&utm_source=social_share&utm_medium=share_button&utm_campaign=share_button.
+InfoQ. « Approche Design-First Du Développement D’API : Comment L’implémenter Et Pourquoi Cela Fonctionne ». Consulté le 30 mai 2023. https://www.infoq.com/fr/articles/design-first-api-development/.
+« ISO 3166 ». In Wikipédia, 14 juillet 2022. https://fr.wikipedia.org/w/index.php?title=ISO_3166&oldid=195308897.
+« Key:highway — OpenStreetMap Wiki ». Consulté le 30 mai 2023. https://wiki.openstreetmap.org/wiki/Key:highway.
+« OGC—Aide ArcGIS Online | Documentation ». Consulté le 30 mai 2023. https://doc.arcgis.com/fr/arcgis-online/reference/ogc.htm.
+Open Geospatial Consortium. « Web Processing Service ». Consulté le 30 mai 2023. https://www.ogc.org/standard/wps/.
+« Openrouteservice ». Consulté le 30 mai 2023. https://openrouteservice.org/.
+« OSRM API Documentation ». Consulté le 30 mai 2023. https://project-osrm.org/docs/v5.24.0/api/#.
+« OverviewCoordinateReferenceSystems.pdf ». Consulté le 30 mai 2023. https://www.nceas.ucsb.edu/sites/default/files/2020-04/OverviewCoordinateReferenceSystems.pdf.
+Smappen. « Tracez vos zones de chalandise ». Consulté le 29 mai 2023. https://www.smappen.fr/zone-de-chalandise/.
+« Valhalla Multi-Purpose Routing Engine - Help, Consulting, Instant Download of Tilepacks ». Consulté le 30 mai 2023. https://www.interline.io/valhalla/.
+« Well-known text ». In Wikipédia, 28 mars 2018. https://fr.wikipedia.org/w/index.php?title=Well-known_text&oldid=146864563
+
+Annexes
+Extrait de l’Architecture Decision Records de Valhalla Routing.
+Résultats de benchmarks effectués en fonction des ressources disponibles.
+Planning rétrospectif du déroulement du projet de fin d’études.
+Critères de sélection du moteur de routing
+
+
+ 
+Développement d’un Géo Service de génération d’isochrones
+Rivaldo Chanceme de SOUZA
+Résumé
+Mots-clés: Isochrone, Géomarketing, Géoservice
+ 	Dans l’activité du Géomarketing, l’une des missions les plus récurrentes consiste à faire des estimations associées à un emplacement géographique physique (un point de vente, un restaurant, …). Ces estimations ont pour but de définir une zone de chalandise, comprenez zone d’influence de l’emplacement sur son environnement. C’est pour représenter cette zone qu’on fait appel au calcul d’isochrone (courbe permettant de délimiter la zone). De nombreux clients de l’entreprise se plaignent de la qualité des résultats du générateur d’isochrones actuel et du fait que son réseau routier soit obsolète. C’est pour répondre à leurs préoccupations que ce projet de fin d’études a été mis sur pied. Ainsi ce projet de fin d’études a pour but de créer une version plus à jour du géoservice de génération d’isochrones, plus performante, plus configurable, plus maintenable … Il s’agit d’un défi technologique à relever quand on considère la complexité du monde des systèmes d’informations géographiques. Durant les 20 semaines de déroulement du projet, j’ai appris énormément de notions en géographie numérique, découvert les applications de plusieurs concepts mathématiques appliqués à la géographie. 
+Abstract
+Keywords: Isochron, Geomarketing, Geoservice
+ 	In Geomarketing, one of the most recurrent missions is to make estimates associated with a physical geographic location (a point of sale, a restaurant, etc.). The aim of these estimates is to define a catchment area, i.e. the zone of influence of the location on its environment. To represent this zone, we use isochrone calculation (curve used to delimit the zone). Many of the company's customers complain about the quality of the results of the current isochrone generator, and the fact that its road network is obsolete. It was in response to their concerns that this final-year project was set up. The aim of this end-of-studies project is to create a more up-to-date version of the isochrone generator geoservice, one that is more efficient, more configurable, more maintainable... It's a technological challenge to take up when you consider the complexity of the world of geographic information systems. During the 20 weeks of the project, I learned a lot about digital geography, and discovered the applications of several mathematical concepts applied to geography.
+
+
